@@ -36,11 +36,17 @@ namespace cosmos_payments_demo.APIs
                 string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 var transaction = JsonConvert.DeserializeObject<Transaction>(requestBody);
 
-                var response = await ProcessTransaction(transaction);
+                IActionResult response;
+                int retryAttemps = 0;
 
-                //Should handle/retry precondition failure
+                do
+                {
+                    response = await ProcessTransaction(transaction);
+                    retryAttemps++;
+                }
+                while (response is StatusCodeResult && ((StatusCodeResult)response).StatusCode == (int)HttpStatusCode.PreconditionFailed && retryAttemps < 10);
 
-                return response;
+                return response;                
             }
             catch (CosmosException ex)
             {
@@ -74,15 +80,7 @@ namespace cosmos_payments_demo.APIs
                 {
                     return new BadRequestObjectResult("Insufficient balance/limit!");
                 }
-                //else
-                //{
-                //    account.balance -= transaction.amount;
-                //}
             }
-            //else if (transaction.type.ToLowerInvariant() == "deposit")
-            //{
-            //    account.balance += transaction.amount;
-            //}
 
             var batch = container.CreateTransactionalBatch(pk);
 
@@ -96,7 +94,7 @@ namespace cosmos_payments_demo.APIs
                     IfMatchEtag = responseRead.ETag 
                 }
             );
-            //batch.UpsertItem<AccountSummary>(account, new TransactionalBatchItemRequestOptions() { IfMatchEtag = responseRead.ETag });
+
             batch.CreateItem<Transaction>(transaction);
 
             var responseBatch = await batch.ExecuteAsync();
