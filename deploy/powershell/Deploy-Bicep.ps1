@@ -2,7 +2,7 @@
 
 Param(
     [parameter(Mandatory=$true)][string]$resourceGroup,
-    [parameter(Mandatory=$true)][string]$location,
+    [parameter(Mandatory=$true)][string]$locations,
     [parameter(Mandatory=$false)][string]$template="main.bicep",
     [parameter(Mandatory=$false)][string]$openAiName,
     [parameter(Mandatory=$false)][string]$openAiRg,
@@ -22,11 +22,11 @@ Write-Host "-------------------------------------------------------- " -Foregrou
 $rg = $(az group show -n $resourceGroup -o json | ConvertFrom-Json)
 if (-not $rg) {
     Write-Host "Creating resource group $resourceGroup in $location" -ForegroundColor Yellow
-    az group create -n $resourceGroup -l $location
+    az group create -n $resourceGroup -l $locations.Split(',')[0]
 }
 
 Write-Host "Beginning the Bicep deployment..." -ForegroundColor Yellow
 Push-Location $sourceFolder
-$deploymentState = $(az deployment group create -g $resourceGroup --template-file $script --parameters suffix=$suffix  --parameters openAiName=$openAiName --parameters openAiDeployment=$openAiDeployment --parameters openAiResourceGroup=$openAiRg --query "properties.provisioningState" -o tsv)
+$deploymentState = $(az deployment group create -g $resourceGroup --template-file $script --parameters locations=$locations --parameters suffix=$suffix  --parameters openAiName=$openAiName --parameters openAiDeployment=$openAiDeployment --parameters openAiResourceGroup=$openAiRg --query "properties.provisioningState" -o tsv)
 Pop-Location
 Pop-Location
