@@ -1,7 +1,7 @@
 'use client';
 
-import { Card, Pagination, Spinner } from 'flowbite-react';
-import { useCallback, useState } from 'react';
+import { Card, Spinner } from 'flowbite-react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { Capitalize, USDollar } from '~/helpers';
 import AccountDetailModal from '~/components/modals/account-detail';
@@ -9,6 +9,7 @@ import Datatable from '~/components/tables/datatable';
 import useAccounts from '~/hooks/accounts';
 import FormModal from '~/components/modals/form';
 import NewAccountForm from '~/components/forms/new-account';
+import _ from 'lodash';
 
 const headers = [
   {
@@ -43,7 +44,9 @@ const headers = [
 
 const AccountsTable = ({ setAccountId, showFormModal, setShowFormModal }) => {
   const [continuationToken, setContinuationToken] = useState('');
-  const [page, setPage] = useState(1);
+  const [nextToken, setNextToken] = useState('');
+  const [rows, setRows] = useState([]);
+  const [page, setPage] = useState(0);
   const [account, setAccount] = useState();
   const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -59,7 +62,27 @@ const AccountsTable = ({ setAccountId, showFormModal, setShowFormModal }) => {
   );
   const onClickTransactions = (accountId) => setAccountId(accountId);
 
-  const formattedData = data?.page.map((row) => {
+  const onClickLoadMore = useCallback(() => {
+    setPage(page + 1);
+    setContinuationToken(nextToken);
+  }, [page, nextToken]);
+
+  const onClickGoToTop = useCallback(() => {
+    setPage(0);
+    setRows([]);
+    setContinuationToken('');
+  }, []);
+
+  useEffect(() => {
+    if (data) {
+      setRows((currRows) =>
+        _.orderBy(_.unionBy([...currRows, ...data.page], 'id'), ['timestamp'], ['desc'])
+      );
+      setNextToken(data.continuationToken);
+    }
+  }, [data]);
+
+  const formattedData = rows.map((row) => {
     return {
       ...row,
       accountType: Capitalize(row.accountType),
@@ -88,18 +111,16 @@ const AccountsTable = ({ setAccountId, showFormModal, setShowFormModal }) => {
           <Spinner aria-label="Loading..." />
         </div>
       ) : (
-        <Datatable headers={headers} data={formattedData} />
+        <div className="tables">
+          <Datatable
+            headers={headers}
+            data={formattedData}
+            onClickLoadMore={onClickLoadMore}
+            continuationToken={data?.continuationToken}
+            onClickGoToTop={onClickGoToTop}
+          />
+        </div>
       )}
-      <Pagination
-        className="p-6 self-center"
-        currentPage={page}
-        layout="navigation"
-        onPageChange={(page) => {
-          setPage(page);
-          setContinuationToken(data.continuationToken);
-        }}
-        totalPages={100}
-      />
       <AccountDetailModal
         openModal={showDetailModal}
         setOpenModal={setShowDetailModal}

@@ -4,10 +4,12 @@ import { Button, Label, Spinner, TextInput } from 'flowbite-react';
 import useAddAccount from '~/hooks/add-account';
 
 const NewAccountForm = ({ setOpenModal }) => {
-  const { trigger } = useAddAccount();
+  const { mutate } = useAddAccount();
+
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
-    id: '0909090908',
-    accountType: '',
+    id: '',
+    accountType: 'Checking',
     balance: '',
     customerGreetingName: '',
     overdraftLimit: ''
@@ -16,7 +18,7 @@ const NewAccountForm = ({ setOpenModal }) => {
   const [isLoading, setIsLoading] = useState(false);
   const onClickCancel = () => {
     setForm({
-      id: '0909090908',
+      id: '',
       accountType: '',
       balance: '',
       customerGreetingName: '',
@@ -28,19 +30,30 @@ const NewAccountForm = ({ setOpenModal }) => {
 
   const onSubmit = async () => {
     setIsLoading(true);
-    const response = await trigger(form);
+    setError('');
 
-    if (response.status === 202) {
-      setOpenModal(false);
-      setIsLoading(false);
-    } else {
-      setIsLoading(false);
-    }
+    mutate(form, {
+      onSuccess: async () => {
+        setOpenModal(false);
+        setIsLoading(false);
+        setForm({
+          id: '',
+          accountType: 'Checking',
+          balance: '',
+          customerGreetingName: '',
+          overdraftLimit: ''
+        });
+        setError('');
+      },
+      onError: (e) => {
+        setError(e?.response?.data ?? 'There was an error creating the account');
+        setIsLoading(false);
+      }
+    });
   };
 
-  const onChangeAccountType = (accountType) => {
-    setForm({ ...form, accountType });
-  };
+  const onChangeAccountId = (e) => setForm({ ...form, id: e.target.value });
+  const onChangeAccountType = (accountType) => setForm({ ...form, accountType });
   const onChangeCustomerGreetingName = (e) =>
     setForm({ ...form, customerGreetingName: e.target.value });
   const onChangeOverdraftLimit = (e) => setForm({ ...form, overdraftLimit: e.target.value });
@@ -48,6 +61,18 @@ const NewAccountForm = ({ setOpenModal }) => {
 
   return (
     <div className="space-y-6">
+      <div className="mb-4">
+        <div className="mb-2 block">
+          <Label htmlFor="accountId" value="Account Id:" />
+        </div>
+        <TextInput
+          id="accountId"
+          placeholder="Account Id"
+          onChange={onChangeAccountId}
+          value={form.accountId}
+          required
+        />
+      </div>
       <div className="mb-4">
         <div className="mb-2 block">
           <Label htmlFor="customerGreetingName" value="Customer Greeting Name:" />
@@ -95,6 +120,7 @@ const NewAccountForm = ({ setOpenModal }) => {
           required
         />
       </div>
+      <p className="text-red-500">{error}</p>
       <div className="w-full flex justify-between pt-4">
         <Button color="light" onClick={onClickCancel}>
           Cancel

@@ -1,7 +1,7 @@
 'use client';
 
-import { Card, Pagination, Spinner } from 'flowbite-react';
-import { useState } from 'react';
+import { Card, Spinner } from 'flowbite-react';
+import { useCallback, useEffect, useState } from 'react';
 
 import Datatable from '~/components/tables/datatable';
 import { Capitalize, USDollar } from '~/helpers';
@@ -32,10 +32,32 @@ const headers = [
 
 const TransactionsStatementTable = ({ accountId }) => {
   const [continuationToken, setContinuationToken] = useState('');
-  const [page, setPage] = useState(1);
-  const { data, isLoading } = useTransactionsStatement(accountId, continuationToken);
+  const [nextToken, setNextToken] = useState('');
+  const [rows, setRows] = useState([]);
+  const [page, setPage] = useState(0);
+  const { data, isLoading, isRefetching } = useTransactionsStatement(accountId, continuationToken);
 
-  const formattedData = data?.page.map((row) => {
+  const onClickLoadMore = useCallback(() => {
+    setPage(page + 1);
+    setContinuationToken(nextToken);
+  }, [page, nextToken]);
+
+  const onClickGoToTop = useCallback(() => {
+    setPage(0);
+    setRows([]);
+    setContinuationToken('');
+  }, []);
+
+  useEffect(() => {
+    if (data) {
+      setRows((currRows) =>
+        _.orderBy(_.unionBy([...currRows, ...data.page], 'id'), ['timestamp'], ['desc'])
+      );
+      setNextToken(data.continuationToken);
+    }
+  }, [data]);
+
+  const formattedData = rows.map((row) => {
     const date = new Date(row.timestamp);
     return {
       ...row,
@@ -48,23 +70,21 @@ const TransactionsStatementTable = ({ accountId }) => {
   return (
     <Card className="card w-full justify-center items-center">
       <div className="text-xl p-6 font-bold">Transactions</div>
-      {isLoading ? (
+      {isLoading || !isRefetching ? (
         <div className="text-center p-6">
           <Spinner aria-label="Loading..." />
         </div>
       ) : (
-        <Datatable headers={headers} data={formattedData} />
+        <div className="tables">
+          <Datatable
+            headers={headers}
+            data={formattedData}
+            onClickLoadMore={onClickLoadMore}
+            continuationToken={data?.continuationToken}
+            onClickGoToTop={onClickGoToTop}
+          />
+        </div>
       )}
-      <Pagination
-        className="p-6 self-center"
-        currentPage={page}
-        layout="navigation"
-        onPageChange={(page) => {
-          setPage(page);
-          setContinuationToken(data.continuationToken);
-        }}
-        totalPages={100}
-      />
     </Card>
   );
 };

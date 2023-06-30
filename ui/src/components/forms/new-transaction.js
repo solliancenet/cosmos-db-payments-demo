@@ -2,9 +2,13 @@ import { useEffect, useState } from 'react';
 import { Button, Label, Spinner, Textarea, TextInput } from 'flowbite-react';
 
 import useAddTransaction from '~/hooks/add-transaction';
+import { useQueryClient } from 'react-query';
 
 const NewTransactionForm = ({ accountId, setOpenModal }) => {
-  const { trigger } = useAddTransaction();
+  const { mutate } = useAddTransaction();
+  const client = useQueryClient();
+
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
     accountId,
     type: 'Credit',
@@ -14,22 +18,26 @@ const NewTransactionForm = ({ accountId, setOpenModal }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const onClickCancel = () => {
-    setForm({ accountId: '', type: '', description: '', merchant: '', amount: '' });
+    setForm({ accountId, type: 'Credit', description: '', merchant: '', amount: '' });
     setIsLoading(false);
     setOpenModal(false);
   };
 
-  const onSubmit = async () => {
+  const onSubmit = () => {
     setIsLoading(true);
-    const response = await trigger(form);
-
-    if (response.status === 200) {
-      setOpenModal(false);
-      setIsLoading(false);
-    } else {
-      setIsLoading(false);
-    }
-    setForm({ accountId: '', type: '', description: '', merchant: '', amount: '' });
+    setError('');
+    mutate(form, {
+      onSuccess: async () => {
+        setOpenModal(false);
+        setIsLoading(false);
+        setForm({ accountId, type: 'Credit', description: '', merchant: '', amount: '' });
+        setError('');
+      },
+      onError: (e) => {
+        setError(e?.response?.data ?? 'There was an error creating the transaction');
+        setIsLoading(false);
+      }
+    });
   };
 
   const onChangeMerchant = (e) => setForm({ ...form, merchant: e.target.value });
@@ -89,6 +97,7 @@ const NewTransactionForm = ({ accountId, setOpenModal }) => {
           value={form.description}
         />
       </div>
+      <p className="text-red-500">{error}</p>
       <div className="w-full flex justify-between pt-4">
         <Button color="light" onClick={onClickCancel}>
           Cancel

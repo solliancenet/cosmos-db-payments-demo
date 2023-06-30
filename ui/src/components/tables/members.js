@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Card, Pagination, Spinner } from 'flowbite-react';
-import { useRouter } from 'next/navigation';
+import { Card, Spinner } from 'flowbite-react';
 
 import Datatable from '~/components/tables/datatable';
 import FormModal from '~/components/modals/form';
 import NewMemberForm from '~/components/forms/new-member';
 import useMembers from '~/hooks/members';
+import _ from 'lodash';
 
 const headers = [
   {
@@ -33,10 +33,10 @@ const headers = [
 ];
 
 const MembersTable = ({ setMember, showFormModal, setShowFormModal }) => {
-  const router = useRouter();
   const [continuationToken, setContinuationToken] = useState('');
-  const [page, setPage] = useState(1);
-
+  const [nextToken, setNextToken] = useState('');
+  const [rows, setRows] = useState([]);
+  const [page, setPage] = useState(0);
   const { data, isLoading } = useMembers(continuationToken);
 
   const onClickDetails = useCallback(
@@ -47,7 +47,25 @@ const MembersTable = ({ setMember, showFormModal, setShowFormModal }) => {
     [data?.page, setMember]
   );
 
-  const formattedData = data?.page.map((row) => {
+  const onClickLoadMore = useCallback(() => {
+    setPage(page + 1);
+    setContinuationToken(nextToken);
+  }, [page, nextToken]);
+
+  const onClickGoToTop = useCallback(() => {
+    setPage(0);
+    setRows([]);
+    setContinuationToken('');
+  }, []);
+
+  useEffect(() => {
+    if (data) {
+      setRows((currRows) => _.unionBy([...currRows, ...data.page], 'id'));
+      setNextToken(data.continuationToken);
+    }
+  }, [data]);
+
+  const formattedData = rows.map((row) => {
     return {
       ...row,
       name: `${row.firstName} ${row.lastName}`,
@@ -69,18 +87,16 @@ const MembersTable = ({ setMember, showFormModal, setShowFormModal }) => {
           <Spinner aria-label="Loading..." />
         </div>
       ) : (
-        <Datatable headers={headers} data={formattedData} />
+        <div className="tables">
+          <Datatable
+            headers={headers}
+            data={formattedData}
+            continuationToken={data?.continuationToken}
+            onClickLoadMore={onClickLoadMore}
+            onClickGoToTop={onClickGoToTop}
+          />
+        </div>
       )}
-      <Pagination
-        className="p-6 self-center"
-        currentPage={page}
-        layout="navigation"
-        onPageChange={(page) => {
-          setPage(page);
-          setContinuationToken(data.continuationToken);
-        }}
-        totalPages={100}
-      />
       <FormModal header={modalHeader} setOpenModal={setShowFormModal} openModal={showFormModal}>
         <NewMemberForm setOpenModal={setShowFormModal} />
       </FormModal>

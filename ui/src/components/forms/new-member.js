@@ -1,15 +1,18 @@
 import { Button, Label, Spinner, Textarea, TextInput } from 'flowbite-react';
 import _ from 'lodash';
 import { useEffect, useState } from 'react';
+import { useQueryClient } from 'react-query';
 import { DiffObjects } from '~/helpers';
 
 import useAddMember from '~/hooks/add-member';
 import useEditMember from '~/hooks/edit-member';
 
 const NewMemberForm = ({ setOpenModal, member = null, setMember }) => {
-  const { trigger: AddTrigger } = useAddMember();
-  const { trigger: EditTrigger } = useEditMember(member?.id);
+  const client = useQueryClient();
+  const { mutate: AddTrigger } = useAddMember();
+  const { mutate: EditTrigger } = useEditMember(member?.id);
 
+  const [error, setError] = useState('');
   const [form, setForm] = useState(
     member ?? {
       address: '',
@@ -34,27 +37,42 @@ const NewMemberForm = ({ setOpenModal, member = null, setMember }) => {
 
   const onSubmit = async () => {
     setIsLoading(true);
-    let response;
-    let modifiedMember;
+    setError('');
+
     if (member) {
-      modifiedMember = DiffObjects(form, member);
-      response = await EditTrigger({
-        ...modifiedMember
+      const modifiedMember = DiffObjects(form, member);
+      EditTrigger(
+        {
+          ...modifiedMember
+        },
+        {
+          onSuccess: async () => {
+            setOpenModal(false);
+            setIsLoading(false);
+            setMember({ ...member, ...modifiedMember });
+            setIsDisabled(false);
+            await client.refetchQueries('members');
+          },
+          onError: () => {
+            setError(e?.response?.data ?? 'There was an error editing the member');
+            setIsLoading(false);
+            setIsDisabled(false);
+          }
+        }
+      );
+    } else {
+      AddTrigger(form, {
+        onSuccess: () => {
+          setOpenModal(false);
+          setIsLoading(false);
+          setIsDisabled(false);
+        },
+        onError: () => {
+          setError(e?.response?.data ?? 'There was an error creating the member');
+          setIsLoading(false);
+          setIsDisabled(false);
+        }
       });
-    } else {
-      response = await AddTrigger(form);
-    }
-
-    setIsDisabled(true);
-
-    if (response.status === 202) {
-      setOpenModal(false);
-      setIsLoading(false);
-      if (member) setMember({ ...member, ...modifiedMember });
-      setIsDisabled(false);
-    } else {
-      setIsLoading(false);
-      setIsDisabled(false);
     }
   };
 
@@ -202,6 +220,7 @@ const NewMemberForm = ({ setOpenModal, member = null, setMember }) => {
           <option>Other</option>
         </select>
       </div>
+      <p className="text-red-500">{error}</p>
       <div className="w-full flex justify-between pt-4">
         <Button color="light" onClick={onClickCancel}>
           Cancel
